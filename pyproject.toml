@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vancomycin-bayesian-auc-engine"
+version = "2.0.0"
+description = "VancoBayes Sentinel: Bayesian 24-Hour AUC24/MIC Pharmacokinetic Engine"
+readme = "README.md"
+authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+vancomycin-bayesian-auc-engine = "vancomycin_bayesian_auc_agent.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-engine"
+Repository = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-engine.git"
