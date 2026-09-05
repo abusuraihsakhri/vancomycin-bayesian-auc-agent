@@ -1,8 +1,7 @@
 """
 Prometheus Operational Metrics Exporter for vancomycin-bayesian-auc-agent.
 """
-import time
-from typing import Dict, Any
+from typing import Dict
 
 class SystemMetricsCollector:
     def __init__(self):

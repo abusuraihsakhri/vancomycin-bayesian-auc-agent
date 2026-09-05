@@ -147,7 +147,7 @@ pytest -v
 Execute high-throughput batch simulation benchmarks:
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python simulator.py --tasks 1000
 ```
 
 ---
@@ -157,4 +157,10 @@ python simulator.py --tasks 1000 --concurrency 8
 ```bash
 docker build -t vancomycin-bayesian-auc-agent .
 docker run -p 8000:8000 vancomycin-bayesian-auc-agent
+```
+
+For production deployments, set a stable audit secret key:
+
+```bash
+docker run -e AUDIT_SECRET_KEY=$(openssl rand -hex 32) -p 8000:8000 vancomycin-bayesian-auc-agent
 ```

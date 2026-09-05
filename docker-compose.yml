@@ -7,7 +7,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - AUDIT_SECRET_KEY=vancomycin-bayesian-auc-engine-prod-audit-key-2026
       - MODEL_PROVIDER=mock
     restart: unless-stopped
     healthcheck:

@@ -1,8 +1,8 @@
 """
 Autonomous Bayesian Calibration & Active Learning Feedback Engine for vancomycin-bayesian-auc-agent.
 """
-import math
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 class WorkerPerformanceMetric(BaseModel):
