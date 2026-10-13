@@ -1,16 +1,11 @@
-version: '3.8'
-
 services:
-  vancomycin-bayesian-auc-engine:
+  vancomycin-bayesian-auc-agent:
     build: .
-    container_name: vancomycin-bayesian-auc-engine
     ports:
       - "8000:8000"
-    environment:
-      - MODEL_PROVIDER=mock
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -80,8 +80,10 @@ def calculate_crcl_cockcroft_gault(
         raise ValueError("Serum creatinine must be positive")
     if weight_kg <= 0:
         raise ValueError("Weight must be positive")
-    if age_years < 0:
-        raise ValueError("Age must be non-negative")
+    if not all(math.isfinite(v) for v in (weight_kg, serum_creatinine_mg_dl)):
+        raise ValueError("Patient parameters must be finite")
+    if not 0 < age_years < 140:
+        raise ValueError("Age must be between 1 and 139 years for this model")
     
     crcl = ((140 - age_years) * weight_kg) / (72 * serum_creatinine_mg_dl)
     if is_female:
@@ -101,8 +103,8 @@ def calculate_vancomycin_clearance(crcl_ml_min: float) -> float:
     Returns:
         Vancomycin clearance in mL/min
     """
-    if crcl_ml_min < 0:
-        raise ValueError("CrCl must be non-negative")
+    if not math.isfinite(crcl_ml_min) or crcl_ml_min < 0:
+        raise ValueError("CrCl must be finite and non-negative")
     return round(crcl_ml_min * DEFAULT_CL_PER_CRCL_SLOPE + DEFAULT_CL_INTERCEPT, 2)
 
 
@@ -129,8 +131,8 @@ def calculate_volume_of_distribution(
     Returns:
         Volume of distribution in liters
     """
-    if weight_kg <= 0:
-        raise ValueError("Weight must be positive")
+    if not math.isfinite(weight_kg) or weight_kg <= 0 or not math.isfinite(vd_per_kg) or vd_per_kg <= 0:
+        raise ValueError("Weight and distribution coefficient must be finite and positive")
     
     if obesity_adjusted and actual_weight_kg and ideal_body_weight_kg:
         if actual_weight_kg > ideal_body_weight_kg:
@@ -157,8 +159,8 @@ def calculate_elimination_rate_constant(cl_ml_min: float, vd_liters: float) -> f
     Returns:
         Ke in h^-1
     """
-    if vd_liters <= 0:
-        raise ValueError("Vd must be positive")
+    if not all(math.isfinite(v) for v in (cl_ml_min, vd_liters)) or cl_ml_min <= 0 or vd_liters <= 0:
+        raise ValueError("Clearance and Vd must be finite and positive")
     cl_l_per_hour = cl_ml_min * 60 / 1000
     ke = cl_l_per_hour / vd_liters
     return round(ke, 4)
@@ -176,9 +178,9 @@ def calculate_half_life(ke: float) -> float:
     Returns:
         Half-life in hours
     """
-    if ke <= 0:
-        raise ValueError("Ke must be positive")
-    return round(0.693 / ke, 2)
+    if not math.isfinite(ke) or ke <= 0:
+        raise ValueError("Ke must be finite and positive")
+    return round(math.log(2) / ke, 2)
 
 
 def calculate_auc24_intermittent(
@@ -206,12 +208,12 @@ def calculate_auc24_intermittent(
     Returns:
         AUC24 in mg*h/L
     """
-    if cl_ml_min <= 0:
-        raise ValueError("Clearance must be positive")
-    if dose_mg <= 0:
-        raise ValueError("Dose must be positive")
-    if tau_hours <= 0:
-        raise ValueError("Dosing interval must be positive")
+    if not all(math.isfinite(v) for v in (dose_mg, cl_ml_min, tau_hours, infusion_hours)):
+        raise ValueError("Regimen parameters must be finite")
+    if cl_ml_min <= 0 or dose_mg <= 0 or tau_hours <= 0:
+        raise ValueError("Dose, clearance and dosing interval must be positive")
+    if not 0 < infusion_hours <= tau_hours:
+        raise ValueError("Infusion duration must be positive and no longer than the interval")
     
     cl_l_per_h = cl_ml_min * 60 / 1000
     auc_interval = dose_mg / cl_l_per_h
@@ -226,35 +228,54 @@ def calculate_trough_steady_state(
     tau_hours: float,
     infusion_hours: float = 1.0
 ) -> float:
+    """One-compartment steady-state pre-dose level for intermittent IV infusion.
+
+    Cmin = [Dose / (Vd * Ke * Tinf)] * [1-exp(-Ke*Tinf)]
+           * exp[-Ke*(tau-Tinf)] / [1-exp(-Ke*tau)].
     """
-    Calculate steady-state trough concentration for intermittent infusion.
-    
-    Ctrough = (Dose / (Vd * Ke * T_inf)) * (1 - e^(-Ke*T_inf)) * 
-              e^(-Ke*(tau - T_inf)) / (1 - e^(-Ke*tau))
-    
-    Simplified (for 1-hour infusion approximation):
-    Ctrough ≈ Cmax * e^(-Ke*(tau - T_inf))
-    where Cmax = (Dose/Vd) / (1 - e^(-Ke*tau))
-    
-    Args:
-        dose_mg: Vancomycin dose in mg
-        vd_liters: Volume of distribution in liters
-        ke: Elimination rate constant in h^-1
-        tau_hours: Dosing interval in hours
-        infusion_hours: Infusion duration in hours
-        
-    Returns:
-        Trough concentration in mg/L
+    if not all(math.isfinite(v) for v in (dose_mg, vd_liters, ke, tau_hours, infusion_hours)):
+        raise ValueError("PK and regimen inputs must be finite")
+    if dose_mg <= 0 or vd_liters <= 0 or ke <= 0 or tau_hours <= 0:
+        raise ValueError("Dose, Vd, Ke and interval must be positive")
+    if not 0 < infusion_hours <= tau_hours:
+        raise ValueError("Infusion duration must be within the dosing interval")
+
+    accumulation = -math.expm1(-ke * tau_hours)
+    infusion_factor = -math.expm1(-ke * infusion_hours)
+    cmax = dose_mg * infusion_factor / (vd_liters * ke * infusion_hours * accumulation)
+    return round(cmax * math.exp(-ke * (tau_hours - infusion_hours)), 2)
+
+
+def predict_steady_state_concentration(
+    dose_mg: float,
+    vd_liters: float,
+    ke: float,
+    tau_hours: float,
+    sample_time_hours: float,
+    infusion_hours: float = 1.0
+) -> float:
+    """Concentration at a specified time after infusion start, at steady state.
+
+    Applies a one-compartment constant-rate infusion with first-order elimination.
+    Sampling time must lie within the dosing interval. Returns mg/L, unrounded
+    so Bayesian optimization is not affected by intermediate rounding.
     """
-    if vd_liters <= 0 or ke <= 0 or tau_hours <= 0:
-        raise ValueError("Vd, Ke, and tau must be positive")
-    
-    # Steady-state Cmax (end of infusion)
-    cmax = (dose_mg / vd_liters) * (1 - math.exp(-ke * infusion_hours)) / (1 - math.exp(-ke * tau_hours))
-    
-    # Trough = Cmax * e^(-ke * (tau - infusion))
+    params = (dose_mg, vd_liters, ke, tau_hours, sample_time_hours, infusion_hours)
+    if not all(math.isfinite(v) for v in params):
+        raise ValueError("PK and sampling inputs must be finite")
+    if dose_mg <= 0 or vd_liters <= 0 or ke <= 0 or tau_hours <= 0:
+        raise ValueError("Dose, Vd, Ke and interval must be positive")
+    if not 0 < infusion_hours <= tau_hours or not 0 <= sample_time_hours <= tau_hours:
+        raise ValueError("Infusion and sampling times must be within the interval")
+
+    accumulation = -math.expm1(-ke * tau_hours)
+    cmax = (dose_mg / (vd_liters * ke * infusion_hours)) * (
+        -math.expm1(-ke * infusion_hours)) / accumulation
     trough = cmax * math.exp(-ke * (tau_hours - infusion_hours))
-    return round(trough, 2)
+    if sample_time_hours <= infusion_hours:
+        return trough * math.exp(-ke * sample_time_hours) + (
+            dose_mg / (vd_liters * ke * infusion_hours)) * (-math.expm1(-ke * sample_time_hours))
+    return cmax * math.exp(-ke * (sample_time_hours - infusion_hours))
 
 
 def calculate_peak_steady_state(
@@ -279,45 +300,33 @@ def calculate_peak_steady_state(
     Returns:
         Peak concentration in mg/L
     """
-    if vd_liters <= 0 or ke <= 0 or tau_hours <= 0:
-        raise ValueError("Vd, Ke, and tau must be positive")
-    
-    cmax = (dose_mg / (vd_liters * ke * infusion_hours)) * (1 - math.exp(-ke * infusion_hours)) / (1 - math.exp(-ke * tau_hours))
-    return round(cmax, 2)
+    return round(predict_steady_state_concentration(
+        dose_mg, vd_liters, ke, tau_hours, infusion_hours, infusion_hours), 2)
 
 
 def calculate_auc24_from_trough(
     trough_mg_l: float,
     ke: float,
-    tau_hours: float
+    tau_hours: float,
+    infusion_hours: float = 1.0
 ) -> float:
+    """Infer AUC24 from an actual *steady-state pre-dose* level and known Ke.
+
+    Assumes one-compartment constant-rate IV infusion, fixed dose intervals,
+    stable renal function and known infusion duration. A single trough does
+    not independently identify Ke or validate these assumptions.
     """
-    Estimate AUC24 from trough concentration using log-trapezoidal method.
-    
-    AUC_interval ≈ Ctrough / Ke (simplified steady-state approximation)
-    AUC24 = AUC_interval * (24 / tau)
-    
-    More precisely:
-    AUC_interval = Ctrough * (e^(Ke*tau) - 1) / Ke
-    AUC24 = AUC_interval * (24 / tau)
-    
-    Args:
-        trough_mg_l: Measured trough concentration in mg/L
-        ke: Elimination rate constant in h^-1
-        tau_hours: Dosing interval in hours
-        
-    Returns:
-        Estimated AUC24 in mg*h/L
-    """
-    if ke <= 0:
-        raise ValueError("Ke must be positive")
-    if trough_mg_l < 0:
-        raise ValueError("Trough must be non-negative")
-    
-    # AUC over one interval from trough
-    auc_interval = trough_mg_l * (math.exp(ke * tau_hours) - 1) / ke
-    auc24 = auc_interval * (24 / tau_hours)
-    return round(auc24, 1)
+    if not all(math.isfinite(v) for v in (trough_mg_l, ke, tau_hours, infusion_hours)):
+        raise ValueError("PK inputs must be finite")
+    if trough_mg_l < 0 or ke <= 0 or tau_hours <= 0:
+        raise ValueError("Trough must be non-negative; Ke and interval positive")
+    if not 0 < infusion_hours <= tau_hours:
+        raise ValueError("Infusion duration must be within the interval")
+
+    factor = (infusion_hours * (-math.expm1(-ke * tau_hours)) /
+              ((-math.expm1(-ke * infusion_hours)) *
+               math.exp(-ke * (tau_hours - infusion_hours))))
+    return round(trough_mg_l * factor * 24 / tau_hours, 1)
 
 
 def calculate_loading_dose(
@@ -506,10 +515,14 @@ def estimate_vd_from_level(
     Returns:
         Estimated Vd in liters
     """
-    if ke <= 0 or peak_mg_l <= 0:
-        raise ValueError("Ke and measured level must be positive")
+    if not all(math.isfinite(v) for v in (dose_mg, ke, peak_mg_l, time_after_dose_hours, infusion_hours)):
+        raise ValueError("Inputs must be finite")
+    if dose_mg <= 0 or ke <= 0 or peak_mg_l <= 0 or infusion_hours <= 0:
+        raise ValueError("Dose, Ke, concentration and infusion must be positive")
+    if time_after_dose_hours < infusion_hours:
+        raise ValueError("Sample must be taken after infusion completion")
     
-    t_after_infusion = max(0, time_after_dose_hours - infusion_hours)
+    t_after_infusion = time_after_dose_hours - infusion_hours
     
     # C = (Dose / (Vd * Ke * T_inf)) * (1 - e^(-Ke*T_inf)) * e^(-Ke*t_after)
     # Vd = (Dose / (C * Ke * T_inf)) * (1 - e^(-Ke*T_inf)) * e^(-Ke*t_after)
@@ -554,10 +567,22 @@ def bayesian_estimate(
     Returns:
         Dictionary with Bayesian-estimated PK parameters
     """
+    if not all(math.isfinite(v) for v in (measured_trough, measured_time_hours, dose_mg, tau_hours,
+                                           weight_kg, crcl_ml_min, infusion_hours)):
+        raise ValueError("Bayesian estimation inputs must be finite")
+    if measured_trough <= 0:
+        raise ValueError("Measured concentration must be positive")
+    if pop_vd is not None and (not math.isfinite(pop_vd) or pop_vd <= 0):
+        raise ValueError("Population Vd must be finite and positive")
+    if pop_ke is not None and (not math.isfinite(pop_ke) or pop_ke <= 0):
+        raise ValueError("Population Ke must be finite and positive")
+    if not 0 < infusion_hours <= tau_hours or not 0 <= measured_time_hours <= tau_hours:
+        raise ValueError("Sampling time and infusion duration must be within the interval")
+
     # Population priors
-    vd_pop = pop_vd if pop_vd else calculate_volume_of_distribution(weight_kg)
+    vd_pop = pop_vd if pop_vd is not None else calculate_volume_of_distribution(weight_kg)
     cl_pop = calculate_vancomycin_clearance(crcl_ml_min)
-    ke_pop = pop_ke if pop_ke else calculate_elimination_rate_constant(cl_pop, vd_pop)
+    ke_pop = pop_ke if pop_ke is not None else calculate_elimination_rate_constant(cl_pop, vd_pop)
     
     # Variance for Bayesian weighting
     sigma_c = 3.0    # mg/L - expected measurement error
@@ -579,14 +604,14 @@ def bayesian_estimate(
             
             # Predict trough at measured time
             try:
-                predicted_trough = calculate_trough_steady_state(
-                    dose_mg, vd_test, ke_test, tau_hours, infusion_hours
+                predicted_level = predict_steady_state_concentration(
+                    dose_mg, vd_test, ke_test, tau_hours, measured_time_hours, infusion_hours
                 )
             except (ValueError, ZeroDivisionError):
                 continue
             
             # Bayesian cost function
-            cost = ((predicted_trough - measured_trough) ** 2 / sigma_c ** 2 +
+            cost = ((predicted_level - measured_trough) ** 2 / sigma_c ** 2 +
                     (vd_test - vd_pop) ** 2 / sigma_vd ** 2 +
                     (ke_test - ke_pop) ** 2 / sigma_ke ** 2)
             
@@ -600,6 +625,8 @@ def bayesian_estimate(
     best_half_life = calculate_half_life(best_ke)
     auc24 = calculate_auc24_intermittent(dose_mg, best_cl, tau_hours, infusion_hours)
     predicted_trough = calculate_trough_steady_state(dose_mg, best_vd, best_ke, tau_hours, infusion_hours)
+    predicted_sample = predict_steady_state_concentration(
+        dose_mg, best_vd, best_ke, tau_hours, measured_time_hours, infusion_hours)
     
     return {
         "bayesian_vd": round(best_vd, 2),
@@ -610,6 +637,8 @@ def bayesian_estimate(
         "population_ke": round(ke_pop, 4),
         "population_cl": round(cl_pop, 2),
         "predicted_trough": predicted_trough,
+        "predicted_sample_concentration": round(predicted_sample, 2),
+        "sample_time_hours": measured_time_hours,
         "measured_trough": measured_trough,
         "auc24": auc24,
         "fit_cost": round(best_cost, 4)
@@ -680,76 +709,22 @@ def full_dosing_assessment(
         auc24 = bayesian["auc24"]
         auc_mic_interp = interpret_auc_mic(auc24, mic)
     
-    # Step 9: Dose adjustment recommendation
-    dose_adjustment = None
-    if measured_trough is not None:
-        # Use measured trough for dose adjustment
-        trough_interp = interpret_trough(measured_trough, infection_severity)
-        if trough_interp["status"] == "SUBTHERAPEUTIC":
-            target_trough = TROUGH_SERIOUS_MIN if infection_severity == "serious" else TROUGH_MODERATE_MIN
-            dose_ratio = target_trough / measured_trough if measured_trough > 0 else 1.5
-            new_dose = round(current_dose_mg * dose_ratio / 250) * 250
-            dose_adjustment = {
-                "action": "INCREASE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": new_dose,
-                "interval_hours": tau_hours,
-                "reason": f"Trough {measured_trough} mg/L is below target"
-            }
-        elif trough_interp["status"] == "SUPRATHERAPEUTIC":
-            target_trough = TROUGH_SERIOUS_MAX if infection_severity == "serious" else TROUGH_MODERATE_MAX
-            dose_ratio = target_trough / measured_trough if measured_trough > 0 else 0.7
-            new_dose = round(current_dose_mg * dose_ratio / 250) * 250
-            dose_adjustment = {
-                "action": "DECREASE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": new_dose,
-                "interval_hours": tau_hours,
-                "reason": f"Trough {measured_trough} mg/L is above target"
-            }
-        else:
-            dose_adjustment = {
-                "action": "NO_CHANGE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": current_dose_mg,
-                "interval_hours": tau_hours,
-                "reason": "Trough within therapeutic range"
-            }
-    else:
-        # Use AUC-based adjustment
-        if auc_mic_interp["status"] == "SUBTHERAPEUTIC":
-            new_dose = adjust_dose_for_target_auc(current_dose_mg, auc24, AUC_TARGET_MID)
-            dose_adjustment = {
-                "action": "INCREASE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": new_dose,
-                "interval_hours": tau_hours,
-                "reason": f"AUC24/MIC {auc_mic_interp['auc_mic_ratio']} below target 400-600"
-            }
-        elif auc_mic_interp["status"] == "SUPRATHERAPEUTIC":
-            new_dose = adjust_dose_for_target_auc(current_dose_mg, auc24, AUC_TARGET_MID)
-            dose_adjustment = {
-                "action": "DECREASE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": new_dose,
-                "interval_hours": tau_hours,
-                "reason": f"AUC24/MIC {auc_mic_interp['auc_mic_ratio']} above target 400-600"
-            }
-        else:
-            dose_adjustment = {
-                "action": "NO_CHANGE",
-                "current_dose": current_dose_mg,
-                "recommended_dose": current_dose_mg,
-                "interval_hours": tau_hours,
-                "reason": "AUC24/MIC within target range"
-            }
-    
-    # Step 10: Loading dose recommendation
+    # Step 9: Research-only interpretation. Never suggest patient-specific dosing
+    # from this illustrative model or trough-only thresholds.
+    dose_adjustment = {
+        "action": "CLINICIAN_REVIEW",
+        "current_dose": current_dose_mg,
+        "recommended_dose": None,
+        "interval_hours": tau_hours,
+        "reason": (
+            "Illustrative AUC24 estimate is {:.1f} mg*h/L. A clinically "
+            "validated Bayesian model, verified dosing history, level timing, "
+            "renal trajectory, organism MIC method and clinician review are "
+            "required before any dose change."
+        ).format(auc24)
+    }
     loading_dose = None
-    if measured_trough is not None and measured_trough < 10:
-        target_peak = 25.0  # mg/L
-        loading_dose = calculate_loading_dose(target_peak, vd)
-    
+
     return {
         "patient_parameters": {
             "weight_kg": weight_kg,
@@ -777,7 +752,8 @@ def full_dosing_assessment(
         "bayesian_estimation": bayesian,
         "dose_recommendation": dose_adjustment,
         "loading_dose_mg": loading_dose,
-        "disclaimer": "FOR EDUCATIONAL/RESEARCH USE ONLY. Not a substitute for clinical pharmacist review."
+        "model_limitations": "Single-compartment illustrative grid search; steady-state assumption; no validated population prior, uncertainty intervals, non-steady-state histories or clinical validation.",
+        "disclaimer": "RESEARCH/EDUCATION ONLY. Do not use for treatment or dose selection. Independent clinical pharmacology review required."
     }
 
 
