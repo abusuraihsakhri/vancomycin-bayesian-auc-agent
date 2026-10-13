@@ -1,27 +1,38 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vancomycin-bayesian-auc-engine"
-version = "2.0.0"
-description = "VancoBayes Sentinel: Bayesian 24-Hour AUC24/MIC Pharmacokinetic Engine"
+name = "vancomycin-bayesian-auc-agent"
+version = "2.0.1"
+description = "Research-only vancomycin one-compartment PK exposure exploration and audit utilities"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "Dr. Abu Suraih Sakhri" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Scientific/Engineering :: Medical Science Apps.",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110,<1", "uvicorn>=0.27,<1", "pydantic>=2,<3"]
+test = ["pytest>=8,<10", "fastapi>=0.110,<1", "pydantic>=2,<3"]
 
 [project.scripts]
 vancomycin-bayesian-auc-engine = "vancomycin_bayesian_auc_agent.cli:main"
+vancomycin-bayesian-auc-agent = "vancomycin_bayesian_auc_agent.cli:main"
+vanco-bayes = "vanco_bayes:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-engine"
-Repository = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-agent"
+Repository = "https://github.com/abusuraihsakhri/vancomycin-bayesian-auc-agent"
+
+[tool.setuptools]
+py-modules = ["vanco_bayes", "enrichment", "simulator", "cli", "vanco_bayes_app", "vancomycin_bayesian_auc_agent_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "vancomycin_bayesian_auc_agent*"]
