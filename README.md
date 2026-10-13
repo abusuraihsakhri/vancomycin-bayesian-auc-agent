@@ -1,166 +1,55 @@
 # Vancomycin Bayesian AUC Agent
 
-> **Domain:** Clinical Pharmacology & Precision Pharmacotherapy  
-> **Reference Guidelines & Standards:** `CPIC Guidelines & FDA Table of Pharmacogenomic Biomarkers`
+Research-only single-compartment vancomycin PK explorer. **Not clinically validated: never use to select a patient dose. Do not enter patient identifiers or PHI.**
 
-<div align="center">
+## Browser application
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
-
-</div>
-
----
-
-## 📖 What It Does
-
-**Vancomycin Bayesian AUC Agent** is an advanced analytical and computational platform implementing Bayesian 24h AUC24/MIC (400-600) Precision Pharmacokinetic Engine.
-
----
-
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-### 🔬 Analytical Functions
-
-- **`calculate_crcl_cockcroft_gault()`**: Calculate creatinine clearance using Cockcroft-Gault equation.
-
-CrCl = ((140 - age) * weight) / (72 * SCr) * (0.85 if female)
-
-Args:
-    weight_kg: Patient weight in kg
-    age_years: Patient age in years
-    serum_creatinine_mg_dl: Serum creatinine in mg/dL
-    is_female: Whether patient is female
-    
-Returns:
-    CrCl in mL/min
-- **`calculate_vancomycin_clearance()`**: Calculate vancomycin clearance using Matzke equation.
-
-CL_vanco (mL/min) = CrCl * 0.689 + 3.66
-
-Args:
-    crcl_ml_min: Creatinine clearance in mL/min
-    
-Returns:
-    Vancomycin clearance in mL/min
-- **`calculate_volume_of_distribution()`**: Calculate volume of distribution.
-
-For obese patients: Vd = Vd_per_kg * IBW + 0.4 * (ABW - IBW)
-For normal: Vd = Vd_per_kg * weight
-
-Args:
-    weight_kg: Weight to use for calculation (kg)
-    vd_per_kg: Volume of distribution per kg (L/kg)
-    obesity_adjusted: Whether to use adjusted body weight
-    actual_weight_kg: Actual body weight (for obese adjustment)
-    ideal_body_weight_kg: Ideal body weight (for obese adjustment)
-    
-Returns:
-    Volume of distribution in liters
-- **`calculate_elimination_rate_constant()`**: Calculate elimination rate constant.
-
-Ke = CL / Vd  (converting CL from mL/min to L/h)
-Ke = (CL_ml_min * 60 / 1000) / Vd_L
-
-Args:
-    cl_ml_min: Clearance in mL/min
-    vd_liters: Volume of distribution in liters
-    
-Returns:
-    Ke in h^-1
-- **`calculate_half_life()`**: Calculate elimination half-life.
-
-t1/2 = 0.693 / Ke
-
-Args:
-    ke: Elimination rate constant in h^-1
-    
-Returns:
-    Half-life in hours
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  Key formulas:
-  Calculate creatinine clearance using Cockcroft-Gault equation.
-  Calculate vancomycin clearance using Matzke equation.
-  Calculate volume of distribution.
-  Calculate elimination rate constant.
-```
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Guided Interactive Mode
-```bash
-python cli.py
-```
-
-### 2. Direct Parameterized Evaluation
-```bash
-python cli.py --input data.csv
-```
-
-### Parameter Reference
-- `--interactive`: Launch guided terminal interactive wizard.
-- `--input <path>`: Evaluate input from JSON or CSV specification.
-- `--json`: Output deterministic structured results in JSON format.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `case_id` | Parameter / observation metric | Required |
-| `patient_synthetic_id` | Parameter / observation metric | Required |
-| `metric_primary` | Parameter / observation metric | Required |
-| `metric_secondary` | Parameter / observation metric | Required |
-| `is_stat` | Parameter / observation metric | Required |
-| `status_flag` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
+The static, dependency-free application in `web/` runs entirely in the browser, with optional one-level penalized parameter fitting, an AUC exposure comparison, and local JSON export. No personal data is uploaded or stored.
 
 ```bash
-pytest -v
+python -m http.server 8001 --directory web
+# Open http://localhost:8001/
 ```
 
-Execute high-throughput batch simulation benchmarks:
+GitHub Pages uses `.github/workflows/pages.yml` when Pages is configured for GitHub Actions. A public live URL must be verified before publication here.
+
+## Python calculator
+
+Python 3.10+:
 
 ```bash
-python simulator.py --tasks 1000
+python -m pip install -e '.[api,test]'
+vanco-bayes assess --weight 80 --age 65 --scr 1.2 --dose 1000 --interval 12
+vanco-bayes auc --dose 1000 --cl 72.56 --interval 12
+vanco-bayes bayesian --trough 15 --dose 1000 --interval 12 --weight 80 --crcl 70
 ```
 
----
+The assessment returns `CLINICIAN_REVIEW` and **no automated replacement dose**. Standalone legacy loading-dose and trough helpers remain for backward compatibility but are not clinically actionable.
 
-## 🐳 Container Deployment
+## Clinical model limits
+
+The implementation uses Cockcroft–Gault CrCl, an empirical clearance relation, 0.7 L/kg population distribution volume, constant-rate IV infusion, steady state, and a coarse weighted grid fit. This is not a validated clinical Bayesian model; it lacks credible intervals and support for complex dosing histories, unstable renal function, dialysis, obesity, or pediatric dosing.
+
+The ASHP/IDSA/PIDS/SIDP 2020 consensus AUC24 target of 400–600 mg·h/L concerns serious MRSA infection **assuming a broth-microdilution MIC of 1 mg/L**. Trough-only targeting of 15–20 mg/L is not recommended for serious MRSA. [Consensus guideline](https://www.idsociety.org/practice-guideline/vancomycin/).
+
+## Legacy agent services
+
+`agents/` and `vancomycin_bayesian_auc_agent/` provide separate generic threshold-audit interfaces; these **do not implement Bayesian vancomycin AUC** and should not be treated as clinical guideline validation.
 
 ```bash
-docker build -t vancomycin-bayesian-auc-agent .
-docker run -p 8000:8000 vancomycin-bayesian-auc-agent
+vancomycin-bayesian-auc-agent audit
+vancomycin-bayesian-auc-agent serve --host 127.0.0.1 --port 8000
+docker compose up --build
 ```
 
-For production deployments, set a stable audit secret key:
+The Docker service exposes the unauthenticated generic audit API, not the browser calculator. Do not expose it publicly or send it protected health information. Its regex identifier guard is not comprehensive de-identification.
+
+## Tests
 
 ```bash
-docker run -e AUDIT_SECRET_KEY=$(openssl rand -hex 32) -p 8000:8000 vancomycin-bayesian-auc-agent
+python -m pytest -q
+node --test web/calculator.test.cjs
+python -m compileall -q agents vancomycin_bayesian_auc_agent vanco_bayes.py enrichment.py
 ```
+
+CI tests Python 3.10–3.12, Node browser-model checks and the package build. Browser data remain local; manual JSON export is the only file output. This repository is [MIT licensed](LICENSE).
