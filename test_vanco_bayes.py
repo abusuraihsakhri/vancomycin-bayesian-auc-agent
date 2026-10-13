@@ -329,7 +329,8 @@ class TestFullAssessment:
             is_female=False, current_dose_mg=750, tau_hours=12,
             measured_trough=8.0
         )
-        assert result["dose_recommendation"]["action"] == "INCREASE"
+        assert result["dose_recommendation"]["action"] == "CLINICIAN_REVIEW"
+        assert result["dose_recommendation"]["recommended_dose"] is None
 
     def test_assessment_with_high_trough(self):
         result = full_dosing_assessment(
@@ -337,7 +338,8 @@ class TestFullAssessment:
             is_female=False, current_dose_mg=1500, tau_hours=12,
             measured_trough=25.0
         )
-        assert result["dose_recommendation"]["action"] == "DECREASE"
+        assert result["dose_recommendation"]["action"] == "CLINICIAN_REVIEW"
+        assert result["dose_recommendation"]["recommended_dose"] is None
 
 
 # ============================================================================
@@ -366,3 +368,65 @@ class TestCLI:
         ret = main(["bayesian", "--trough", "15.0", "--dose", "1000",
                      "--interval", "12", "--weight", "80", "--crcl", "70"])
         assert ret == 0
+
+
+# Analytical invariants and clinical safety regressions
+def test_constant_infusion_peak_trough_relationship():
+    dose, volume, ke, tau, tinf = 1000.0, 50.0, 0.10, 12.0, 1.0
+    peak = calculate_peak_steady_state(dose, volume, ke, tau, tinf)
+    trough = calculate_trough_steady_state(dose, volume, ke, tau, tinf)
+    expected_peak = (dose / (volume * ke * tinf)) * (
+        1 - math.exp(-ke * tinf)) / (1 - math.exp(-ke * tau))
+    assert peak == pytest.approx(expected_peak, abs=0.01)
+    assert trough == pytest.approx(expected_peak * math.exp(-ke * (tau - tinf)), abs=0.01)
+
+
+def test_trough_derived_auc_matches_dose_over_clearance():
+    dose, volume, ke, tau = 1000.0, 50.0, 0.10, 12.0
+    trough = calculate_trough_steady_state(dose, volume, ke, tau)
+    inferred_auc = calculate_auc24_from_trough(trough, ke, tau)
+    expected_auc = dose / (volume * ke) * (24 / tau)
+    assert inferred_auc == pytest.approx(expected_auc, abs=0.25)
+
+
+def test_time_resolved_concentration_and_bayesian_sample_timing():
+    from vanco_bayes import predict_steady_state_concentration
+    dose, volume, ke, tau = 1000.0, 50.0, 0.10, 12.0
+    peak = predict_steady_state_concentration(dose, volume, ke, tau, 1.0)
+    late = predict_steady_state_concentration(dose, volume, ke, tau, 10.0)
+    trough = predict_steady_state_concentration(dose, volume, ke, tau, 12.0)
+    assert peak > late > trough > 0
+    kwargs = dict(measured_trough=15.0, dose_mg=1000, tau_hours=12,
+                  weight_kg=80, crcl_ml_min=70.0)
+    early = bayesian_estimate(measured_time_hours=2.0, **kwargs)
+    late_fit = bayesian_estimate(measured_time_hours=12.0, **kwargs)
+    assert (early["bayesian_vd"], early["bayesian_ke"]) != (
+        late_fit["bayesian_vd"], late_fit["bayesian_ke"])
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_regimen_inputs_rejected(value):
+    with pytest.raises(ValueError):
+        calculate_trough_steady_state(1000, 50, 0.1, value)
+    with pytest.raises(ValueError):
+        bayesian_estimate(15, 12, 1000, 12, 80, value)
+
+
+def test_invalid_sample_time_and_infusion_rejected():
+    from vanco_bayes import predict_steady_state_concentration
+    with pytest.raises(ValueError):
+        predict_steady_state_concentration(1000, 50, 0.1, 12, 13)
+    with pytest.raises(ValueError):
+        calculate_trough_steady_state(1000, 50, 0.1, 12, 13)
+    with pytest.raises(ValueError):
+        estimate_vd_from_level(1000, 0.1, 20, 0.5, infusion_hours=1)
+
+
+def test_research_assessment_never_returns_automatic_dose():
+    report = full_dosing_assessment(
+        weight_kg=80, age_years=65, serum_creatinine_mg_dl=1.2,
+        is_female=False, current_dose_mg=1000, tau_hours=12,
+        measured_trough=8.0)
+    assert report["dose_recommendation"]["action"] == "CLINICIAN_REVIEW"
+    assert report["dose_recommendation"]["recommended_dose"] is None
+    assert report["loading_dose_mg"] is None
