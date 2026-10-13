@@ -1,236 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vancomycin Bayesian Auc Engine — Operations Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #090d16;
-            --card: #111827;
-            --border: #1f293d;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.25);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            padding: 2rem;
-            min-height: 100vh;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .header-title h1 { font-size: 1.6rem; font-weight: 700; color: #fff; }
-        .header-title p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
-        .badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--accent-glow);
-            color: var(--accent);
-            border: 1px solid var(--accent);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 1.5rem;
-        }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .card h2 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-        input, select, textarea {
-            width: 100%;
-            padding: 0.65rem 0.9rem;
-            background: #0d1322;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: #fff;
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
-        .btn {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 0.7rem 1.4rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            width: 100%;
-        }
-        .btn:hover { background: #2563eb; }
-        .terminal {
-            background: #060911;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #10b981;
-            height: 380px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .metrics-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .metric-box {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-        }
-        .metric-val { font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 0.25rem; }
-        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Vancomycin PK Research Calculator</title>
+<style>
+:root {font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e5e9f1;background:#0d1522}
+* {box-sizing:border-box}
+body {margin:0;line-height:1.5}
+main {max-width:1100px;margin:auto;padding:1.5rem}
+h1 {font-size:clamp(1.45rem,3vw,2rem);margin:.25rem 0}
+h2 {font-size:1.15rem;margin:0 0 1rem}
+p {margin:.5rem 0 1rem}
+small,.muted {color:#b5bfd0}
+a {color:#a9c8ff}
+.warning {border-left:4px solid #e6b35c;padding:.8rem 1rem;background:#252318;color:#ffe3a9;margin:1.5rem 0}
+.grid {display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:1.2rem;align-items:start}
+.panel {background:#162235;border:1px solid #30415a;border-radius:12px;padding:1.2rem}
+.fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+label {display:block;color:#d5deee;font-size:.88rem;font-weight:600}
+input,select {width:100%;margin-top:.25rem;border:1px solid #667991;background:#0e192a;color:#fff;border-radius:6px;padding:.65rem;font:inherit}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible {outline:3px solid #e6b35c;outline-offset:2px}
+button {border:0;border-radius:7px;padding:.75rem 1rem;font:inherit;font-weight:700;background:#6a9ff1;color:#061222;cursor:pointer}
+button:hover {background:#9ec6ff}
+.actions {display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1rem}
+button.secondary {background:#30415a;color:#fff}
+#errors {color:#ffb6a9;min-height:1.4rem}
+.stats {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
+.stat {background:#0e192a;border-radius:8px;padding:.8rem;min-width:0}
+.stat span {display:block;font-size:.75rem;color:#b5bfd0}
+.stat strong {display:block;font-variant-numeric:tabular-nums;font-size:1.35rem;overflow-wrap:anywhere}
+.summary {border:1px solid #475970;border-radius:7px;padding:.75rem;margin:1rem 0}
+#results[hidden] {display:none}
+footer {margin-top:1.5rem;color:#b5bfd0;font-size:.88rem}
+@media(max-width:780px){.grid{grid-template-columns:1fr}}
+@media(max-width:430px){.fields,.stats{grid-template-columns:1fr}main{padding:1rem}}
+</style>
+<script src="./calculator.js" defer></script>
+<script src="./ui.js" defer></script>
 </head>
 <body>
-
-    <div class="header">
-        <div class="header-title">
-            <h1>Vancomycin Bayesian Auc Engine</h1>
-            <p>Domain: Clinical & Cryptographic AI | Standard: CAP / CLSI / NIST Standards | LabMind-Atlas Architecture</p>
-        </div>
-        <div>
-            <span class="badge">Air-Gapped Active</span>
-            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Zero-PHI Guard Active</span>
-        </div>
-    </div>
-
-    <div class="metrics-bar">
-        <div class="metric-box">
-            <div class="metric-label">System Status</div>
-            <div class="metric-val" style="color: var(--success);" id="m-status">OPTIMAL</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Tasks Processed</div>
-            <div class="metric-val" id="m-tasks">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Audit Blocks Signed</div>
-            <div class="metric-val" id="m-audit">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">PHI Interceptions</div>
-            <div class="metric-val" style="color: var(--accent);" id="m-phi">0</div>
-        </div>
-    </div>
-
-    <div class="grid">
-        <div class="card">
-            <h2>⚙️ Dispatch Distributed Component Audit</h2>
-            <div class="form-group">
-                <label>Task / Sample ID</label>
-                <input type="text" id="task_id" value="TASK-2026-LIVE-01">
-            </div>
-            <div class="form-group">
-                <label>Target Identifier</label>
-                <input type="text" id="target_id" value="SPECIMEN-ALPHA-77">
-            </div>
-            <div class="form-group">
-                <label>Primary Measurement / Value</label>
-                <input type="number" id="primary_metric" value="29.4" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Secondary Metric / Kinetic Index</label>
-                <input type="number" id="secondary_metric" value="14.8" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Status / Phenotype Descriptor</label>
-                <input type="text" id="status_descriptor" value="DISCORDANT_ANOMALY">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" id="is_critical" checked> Trigger Emergency / Critical Flag</label>
-            </div>
-            <button class="btn" onclick="runAudit()">Execute Distributed Component Audit</button>
-        </div>
-
-        <div class="card">
-            <h2>📊 Real-Time Consensus Dossier & Audit Log</h2>
-            <div class="terminal" id="outputConsole">// Vancomycin Bayesian Auc Engine Operations Console Ready
-// Connection established with Air-Gapped Supervisor
-// Cryptographic HMAC-SHA256 audit ledger loaded.
-// Ready for live task payload dispatch...</div>
-        </div>
-    </div>
-
-    <script>
-        async function runAudit() {
-            const consoleEl = document.getElementById('outputConsole');
-            consoleEl.innerText = "// Dispatching task across specialized workers...
-// Invoking InvariantQCWorker, SafetyEscalationWorker, ProtocolWorker...";
-
-            const payload = {
-                task_id: document.getElementById('task_id').value,
-                target_identifier: document.getElementById('target_id').value,
-                primary_metric: parseFloat(document.getElementById('primary_metric').value),
-                secondary_metric: parseFloat(document.getElementById('secondary_metric').value),
-                status_descriptor: document.getElementById('status_descriptor').value,
-                is_critical_flag: document.getElementById('is_critical').checked
-            };
-
-            try {
-                const res = await fetch('/api/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                consoleEl.innerText = JSON.stringify(data, null, 2);
-                document.getElementById('m-tasks').innerText = parseInt(document.getElementById('m-tasks').innerText) + 1;
-                document.getElementById('m-audit').innerText = parseInt(document.getElementById('m-audit').innerText) + 1;
-            } catch (err) {
-                consoleEl.innerText = "// Offline / Simulation Output:\n" + JSON.stringify({
-                    dossier_id: "DOSSIER-SIM-" + Math.floor(Math.random()*10000),
-                    system: "vancomycin-bayesian-auc-engine",
-                    domain: "Clinical & Cryptographic AI",
-                    task_id: payload.task_id,
-                    overall_urgency: payload.is_critical_flag ? "CRITICAL_STAT_PANIC" : "ELEVATED_RISK",
-                    integrity_status: "DISCORDANT_ANOMALY",
-                    alerts: [
-                        { worker: "InvariantQCWorker", alert: "Primary metric exceeds upper reference bound" },
-                        { worker: "SafetyEscalationWorker", alert: "Critical emergency interlock flag active" }
-                    ],
-                    audit_hash: "HMAC_SHA256_e83f9a72b941d6c381f9"
-                }, null, 2);
-            }
-        }
-    </script>
+<main>
+<header>
+<p class="muted">Research tools / Clinical pharmacokinetics</p>
+<h1>Vancomycin PK exposure explorer</h1>
+<p>One-compartment steady-state exposure model, with an optional penalized population-parameter fit to one serum concentration.</p>
+</header>
+<section class="warning" aria-label="Clinical safety notice">
+<strong>For research and education only. Not a clinical dosing calculator.</strong>
+<p>Not validated for patient care, therapeutic drug monitoring, or individualized dose selection. Do not enter patient identifiers. Model assumes fixed intermittent IV infusions, steady state, stable renal function and a simplified population prior. In particular, a single level cannot uniquely identify clearance and distribution volume.</p>
+</section>
+<div class="grid">
+<section class="panel" aria-labelledby="inputs-heading">
+<h2 id="inputs-heading">Illustrative scenario</h2>
+<form id="pk-form" novalidate>
+<div class="fields">
+<label for="weight">Weight (kg)<input id="weight" type="number" min="1" step="any" value="80" required></label>
+<label for="age">Age (years; adults only)<input id="age" type="number" min="18" max="120" step="1" value="65" required></label>
+<label for="scr">Serum creatinine (mg/dL)<input id="scr" type="number" min="0.01" step="any" value="1.2" required></label>
+<label for="female">Cockcroft–Gault sex factor<select id="female"><option value="false">Male coefficient</option><option value="true">Female coefficient (0.85)</option></select></label>
+<label for="dose">Infusion dose (mg)<input id="dose" type="number" min="1" step="any" value="1000" required></label>
+<label for="interval">Dose interval (hours)<input id="interval" type="number" min="0.1" step="any" value="12" required></label>
+<label for="infusion">Infusion duration (hours)<input id="infusion" type="number" min="0.1" step="any" value="1" required></label>
+<label for="mic">MIC (mg/L; assumed 1 for target comparison)<input id="mic" type="number" min="0.01" step="any" value="1" required></label>
+<label for="level">Optional observed level (mg/L)<input id="level" type="number" min="0.01" step="any" placeholder="Leave blank for population estimate"></label>
+<label for="sampleTime">Sample time since infusion start (hours)<input id="sampleTime" type="number" min="0" step="any" placeholder="Required when level entered"></label>
+</div>
+<div class="actions"><button type="submit">Calculate exposure</button><button type="button" class="secondary" id="export" disabled>Export JSON</button></div>
+</form>
+<p id="errors" role="alert" aria-live="polite"></p>
+<small>All calculations execute locally in this browser. No server request, patient storage, or analytics is used by this tool.</small>
+</section>
+<section class="panel" aria-labelledby="output-heading">
+<h2 id="output-heading">Estimated exposure</h2>
+<p class="muted" id="empty">Enter a scenario and select “Calculate exposure”.</p>
+<div id="results" hidden aria-live="polite">
+<p id="mode"></p>
+<div class="stats">
+<div class="stat"><span>AUC24 (mg·h/L)</span><strong id="auc"></strong></div>
+<div class="stat"><span>AUC24/MIC</span><strong id="ratio"></strong></div>
+<div class="stat"><span>Vancomycin clearance (L/h)</span><strong id="cl"></strong></div>
+<div class="stat"><span>Vd (L)</span><strong id="vd"></strong></div>
+<div class="stat"><span>Predicted peak (mg/L)</span><strong id="peak"></strong></div>
+<div class="stat"><span>Predicted trough (mg/L)</span><strong id="trough"></strong></div>
+<div class="stat"><span>Elimination half-life (h)</span><strong id="half"></strong></div>
+<div class="stat"><span>Estimated CrCl (mL/min)</span><strong id="crcl"></strong></div>
+</div>
+<p class="summary" id="interpretation"></p>
+<p class="muted" id="fit"></p>
+</div>
+<p class="muted">The 400–600 mg·h/L target in the 2020 ASHP/IDSA/PIDS/SIDP guideline concerns serious MRSA infections, assuming a broth-microdilution MIC of 1 mg/L. Trough-only targeting of 15–20 mg/L is not recommended for these infections.</p>
+<p><a href="https://www.idsociety.org/practice-guideline/vancomycin/" rel="noopener noreferrer" target="_blank">Read the consensus guideline</a></p>
+</section>
+</div>
+<footer>Illustrative model: Cockcroft–Gault → Matzke clearance → Vd 0.7 L/kg → constant-rate infusion PK. Not suitable for obesity, evolving renal function, renal replacement therapy, unstable dosing histories, or clinical decisions without validation.</footer>
+</main>
 </body>
 </html>
